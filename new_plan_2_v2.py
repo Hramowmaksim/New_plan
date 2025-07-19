@@ -10,10 +10,10 @@ class ContainerApp:
         self.root = root
         self.root.title("Размещение груза в контейнере")
         
-        # Размеры контейнера в мм (6060 x 2440 x 2900)
-        self.container_length_mm = 6060  # Длина
-        self.container_width_mm = 2440   # Ширина
-        self.container_height_mm = 2900  # Высота
+        # Внутренние размеры стандартного 20-футового контейнера в миллиметрах 
+        self.container_length_mm = 5905  # Длина
+        self.container_width_mm = 2350   # Ширина
+        self.container_height_mm = 2381  # Высота
         
         # Масштаб для отображения (1 мм = 0.1 пикселя)
         self.scale = 0.1
@@ -55,12 +55,15 @@ class ContainerApp:
         self.weight_entry = tk.Entry(self.input_frame)
         self.weight_entry.pack()
         
-        # Фрейм для кнопок добавления, экспорта и импорта
+        # Фрейм для кнопок добавления, экспорта и импорта а так же кнопки удаления
         self.button_frame = tk.Frame(self.input_frame)
         self.button_frame.pack(pady=10)
         
         self.add_button = tk.Button(self.button_frame, text="Добавить груз", command=self.add_cargo)
         self.add_button.pack(side=tk.LEFT, padx=5)
+
+        self.delete_button = tk.Button(self.button_frame, text="Удалить выбранный",command=self.delete_selected_cargo)
+        self.delete_button.pack(side=tk.LEFT, padx=5)
         
         self.export_button = tk.Button(self.button_frame, text="Экспорт XLSX", command=self.export_to_excel)
         self.export_button.pack(side=tk.LEFT, padx=5)
@@ -153,6 +156,8 @@ class ContainerApp:
         self.top_canvas.bind("<Button-1>", self.on_click)
         self.top_canvas.bind("<B1-Motion>", self.on_drag)
         self.top_canvas.bind("<ButtonRelease-1>", self.on_release)
+        for canvas in (self.top_canvas, self.side_canvas, self.front_canvas):
+            canvas.bind("<Double-1>", self.erase_cargo_on_canvas)
         
         # Список для хранения всех грузов
         self.cargos = []
@@ -267,6 +272,33 @@ class ContainerApp:
         except ValueError:
             messagebox.showerror("Ошибка", "Введите корректные числовые значения")
     
+    def delete_selected_cargo(self):  #Метод удаления выбранного груза из таблицы Добавьте в клас
+        selection = self.tree.selection()
+        if not selection:
+            messagebox.showerror("Ошибка", "Выберите груз в таблице для удаления")
+            return
+
+        item = selection[0]
+        values = self.tree.item(item, "values")
+        name = values[0]  # название груза
+
+        # Найдём соответствующий груз в списке cargos
+        cargo_to_remove = None
+        for cargo in self.cargos:
+            if cargo['name'] == name:
+                cargo_to_remove = cargo
+                break
+
+        if cargo_to_remove:
+            # Удаляем с холстов
+            self.top_canvas.delete(cargo_to_remove['top_id'])
+            self.side_canvas.delete(cargo_to_remove['side_id'])
+            self.front_canvas.delete(cargo_to_remove['front_id'])
+
+            # Удаляем из списка и таблицы
+            self.cargos.remove(cargo_to_remove)
+            self.tree.delete(item)
+
     def export_to_excel(self):
         """Экспортирует таблицу грузов в файл XLSX"""
         if not self.cargos:
@@ -453,6 +485,28 @@ class ContainerApp:
     
     def on_release(self, event):
         self.selected_cargo = None
+
+    def erase_cargo_on_canvas(self, event):
+        canvas = event.widget
+        items = canvas.find_overlapping(event.x, event.y, event.x, event.y)
+        if not items:
+            return
+
+        # Найдём cargo по id прямоугольника
+        clicked_id = items[-1]
+        for cargo in self.cargos:
+            if (cargo['top_id'] == clicked_id or
+                cargo['side_id'] == clicked_id or
+                cargo['front_id'] == clicked_id):
+
+                # Удаляем только прямоугольники
+                self.top_canvas.delete(cargo['top_id'])
+                self.side_canvas.delete(cargo['side_id'])
+                self.front_canvas.delete(cargo['front_id'])
+
+                # Прямоугольники можно заново нарисовать при желании,
+                # но строка в таблице остаётся
+                break
 
 if __name__ == "__main__":
     root = tk.Tk()
